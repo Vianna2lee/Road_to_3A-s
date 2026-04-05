@@ -23,7 +23,7 @@
 <div id="root"><div style="padding:2rem;font-family:sans-serif;color:#666">Loading...</div></div>
 <script type="text/babel">
 const {useState,useEffect,useRef,useCallback}=React;
-const TABS=["Timetable","Past Papers","Weak Topics"];
+const TABS=["Past Papers","Weak Topics"];
 const SUPA_URL="https://wwcwiobbetizfbqwufvt.supabase.co";
 const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3Y3dpb2JiZXRpemZicXd1ZnZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MDAxOTEsImV4cCI6MjA5MDM3NjE5MX0.ma4_zIE5MVnFN38B4QLoz6bzpQSsaZbH-WAwo7lNDv4";
 
@@ -83,126 +83,7 @@ const BASE_PAPERS=[
   ...[2024,2023,2022,2019].flatMap(y=>["H446/01 Computer Systems","H446/02 Algorithms & Programming"].map((p,i)=>({id:"cs_"+y+"_"+i,subject:"Computer Science",paper:p,year:String(y),pmtUrl:"https://www.physicsandmathstutor.com/a-level-computer-science/ocr/past-papers/"}))),
 ];
 
-const TT={
-  "Monday 30 Mar":[
-    {t:"9:00–10:30",s:"Maths",task:"Past paper errors: redo all wrong Qs from your most recent Maths paper"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–12:15",s:"Maths",task:"Weak topics from error log — 3 Qs per topic until confident"},
-    {t:"12:15–13:00",s:"Break",task:"Lunch"},
-    {t:"13:00–14:30",s:"Further Maths",task:"Past paper errors: redo all wrong Qs from your most recent FM paper"},
-    {t:"14:45–16:00",s:"Further Maths",task:"Weak topics from FM error log — 3 Qs per topic"},
-    {t:"16:15–17:00",s:"Computer Science",task:"CS past paper errors: redo wrong Qs + active recall on weak topics"},
-  ],
-  "Tuesday 1 Apr — tutoring":[
-    {t:"9:00–10:30",s:"Maths",task:"Weak topics from error log — work through until confident"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–12:00",s:"Further Maths",task:"Weak topics from FM error log — 3 Qs per topic"},
-    {t:"12:00–12:45",s:"Break",task:"Lunch"},
-    {t:"12:45–14:00",s:"Maths",task:"Mixed Qs on this week's weak topics — timed practice"},
-    {t:"14:00–16:00",s:"Maths",task:"MATHS TUTORING SESSION — bring full error log"},
-    {t:"16:00–16:15",s:"Break",task:"Break"},
-    {t:"16:15–17:15",s:"Further Maths",task:"Any remaining FM weak topics from error log"},
-  ],
-  "Wednesday 2 Apr":[
-    {t:"9:00–10:30",s:"Maths",task:"Weak topics from error log — continue until confident"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–12:00",s:"Further Maths",task:"FM weak topics — continue from error log"},
-    {t:"12:00–12:45",s:"Break",task:"Lunch"},
-    {t:"12:45–14:00",s:"Maths",task:"Mixed timed practice: all weak topics covered this week — 6 min per Q"},
-    {t:"14:15–15:30",s:"Further Maths",task:"FM mixed timed practice: weak topics — 6 min per Q"},
-    {t:"15:45–17:00",s:"Computer Science",task:"CS weak topics from error log + active recall"},
-  ],
-  "Thursday 3 Apr":[
-    {t:"9:00–10:30",s:"Maths",task:"Maths timed paper — Paper 1 Pure (2h, exam conditions)"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–11:45",s:"Maths",task:"Mark paper + error log: every dropped mark"},
-    {t:"11:45–12:30",s:"Break",task:"Lunch"},
-    {t:"12:30–14:00",s:"Further Maths",task:"FM timed paper — Core Pure (90 min, exam conditions)"},
-    {t:"14:15–15:00",s:"Further Maths",task:"Mark FM paper + error log"},
-    {t:"15:15–16:30",s:"Maths",task:"Redo all errors from today's Maths paper immediately"},
-  ],
-  "Friday 4 Apr":[
-    {t:"9:00–10:30",s:"Maths",task:"Weak topics from Thursday paper error log — 3 Qs per topic"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–12:00",s:"Further Maths",task:"Weak topics from Thursday FM paper error log — 3 Qs per topic"},
-    {t:"12:00–12:45",s:"Break",task:"Lunch"},
-    {t:"12:45–14:00",s:"Maths",task:"Maths timed paper — Paper 2 Pure (2h, exam conditions)"},
-    {t:"14:15–15:00",s:"Maths",task:"Mark + error log for Paper 2"},
-    {t:"15:15–16:30",s:"Computer Science",task:"CS timed past paper section — mark + error log"},
-  ],
-  "Saturday 5 Apr — tutoring":[
-    {t:"9:00–10:30",s:"Maths",task:"Redo all errors from Friday Paper 2 immediately"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–11:45",s:"Maths",task:"Weak topics from Paper 2 error log — 3 Qs per topic"},
-    {t:"11:45–12:30",s:"Break",task:"Lunch"},
-    {t:"12:30–14:30",s:"Maths",task:"MATHS TUTORING SESSION — bring all error logs from this week"},
-    {t:"14:45–16:00",s:"Further Maths",task:"FM weak topics from this week error logs"},
-    {t:"16:00–16:15",s:"Break",task:"Break"},
-    {t:"16:15–17:15",s:"Computer Science",task:"CS weak topics from error log"},
-  ],
-  "Sunday 6 Apr — lighter day":[
-    {t:"9:00–10:00",s:"Maths",task:"Quick review: all error logs from this week — what still needs work?"},
-    {t:"10:15–11:00",s:"Further Maths",task:"FM: redo any Qs you still feel unsure on from error logs"},
-    {t:"11:00–11:30",s:"Break",task:"Break"},
-    {t:"11:30–12:00",s:"Computer Science",task:"CS: active recall on weakest topics"},
-    {t:"12:00 onwards",s:"Break",task:"Rest — non-negotiable."},
-  ],
-  "Monday 7 Apr":[
-    {t:"9:00–10:30",s:"Maths",task:"Weak topics still remaining from all error logs — 3 Qs per topic"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–12:00",s:"Further Maths",task:"FM weak topics still remaining — 3 Qs per topic"},
-    {t:"12:00–12:45",s:"Break",task:"Lunch"},
-    {t:"12:45–14:15",s:"Maths",task:"Maths timed paper — Paper 3 Stats & Mech (2h, exam conditions)"},
-    {t:"14:30–15:15",s:"Maths",task:"Mark Paper 3 + error log"},
-    {t:"15:30–16:30",s:"Computer Science",task:"CS timed past paper — mark + error log"},
-  ],
-  "Tuesday 8 Apr":[
-    {t:"9:00–10:30",s:"Maths",task:"Redo all errors from Paper 3 immediately"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–12:00",s:"Maths",task:"Weak topics from Paper 3 error log — 3 Qs per topic"},
-    {t:"12:00–12:45",s:"Break",task:"Lunch"},
-    {t:"12:45–14:00",s:"Further Maths",task:"FM1 + FS1 timed paper (90 min, exam conditions)"},
-    {t:"14:15–15:00",s:"Further Maths",task:"Mark FM1/FS1 paper + error log"},
-    {t:"15:15–16:30",s:"Further Maths",task:"Redo all FM1/FS1 errors immediately"},
-  ],
-  "Wednesday 9 Apr":[
-    {t:"9:00–10:30",s:"Maths",task:"Persistent weak topics — any topic that appeared in 2+ error logs"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–12:00",s:"Further Maths",task:"FM weak topics from Tue FM paper — 3 Qs per topic"},
-    {t:"12:00–12:45",s:"Break",task:"Lunch"},
-    {t:"12:45–14:00",s:"Maths",task:"Mixed timed practice: hardest topics from all error logs"},
-    {t:"14:15–15:30",s:"Further Maths",task:"FM mixed timed practice: hardest topics from all error logs"},
-    {t:"15:45–17:00",s:"Computer Science",task:"CS weak topics from error log — active recall + past paper Qs"},
-  ],
-  "Thursday 10 Apr":[
-    {t:"9:00–10:30",s:"Maths",task:"Final Maths mixed paper — any unseen past paper (2h, exam conditions)"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–11:45",s:"Maths",task:"Mark + error log — are weak topics improving vs earlier papers?"},
-    {t:"11:45–12:30",s:"Break",task:"Lunch"},
-    {t:"12:30–14:00",s:"Further Maths",task:"Final FM mixed paper (90 min, exam conditions)"},
-    {t:"14:15–15:00",s:"Further Maths",task:"Mark + error log"},
-    {t:"15:15–16:30",s:"Maths",task:"Redo any remaining errors — nothing carries forward to exam"},
-  ],
-  "Friday 11 Apr":[
-    {t:"9:00–10:30",s:"Maths",task:"Final weak topics: any topic still in error logs — last chance"},
-    {t:"10:30–10:45",s:"Break",task:"Break"},
-    {t:"10:45–12:00",s:"Further Maths",task:"FM final weak topics from all error logs this Easter"},
-    {t:"12:00–12:45",s:"Break",task:"Lunch"},
-    {t:"12:45–14:00",s:"Computer Science",task:"CS final review: active recall all topics, past paper Qs on weak areas"},
-    {t:"14:15–15:30",s:"Maths",task:"Light mixed practice — confidence check, nothing new"},
-    {t:"15:30 onwards",s:"Break",task:"Rest before Saturday tutoring."},
-  ],
-  "Saturday 12 Apr — tutoring":[
-    {t:"9:00–10:00",s:"Maths",task:"Final review: all Easter error logs — which topics improved, which still weak?"},
-    {t:"10:00–10:15",s:"Break",task:"Break"},
-    {t:"10:15–11:15",s:"Further Maths",task:"FM final review: weakest topics from all Easter error logs"},
-    {t:"11:15–12:00",s:"Break",task:"Lunch"},
-    {t:"12:00–14:00",s:"Maths",task:"MATHS TUTORING SESSION — bring all Easter error logs"},
-    {t:"14:15–15:15",s:"Further Maths",task:"FM1 + FS1 final Qs on weakest topics"},
-    {t:"15:15–16:00",s:"Break",task:"Break"},
-    {t:"16:00–17:00",s:"Computer Science",task:"CS final active recall — all topics"},
-  ],
-};
+
 
 function getBoundary(subject,paper,year){return((PB[subject]||{})[paper]||{})[parseInt(year)]||null;}
 function gradeLabel(score,b){
@@ -454,7 +335,6 @@ function App(){
   const[ready,setReady]=useState(false);
   const[tab,setTab]=useState(0);
   const[paperData,setPaperData]=useState({});
-  const[doneTasks,setDoneTasks]=useState({});
   const[doneTopics,setDoneTopics]=useState({});
   const[customPapers,setCustomPapers]=useState([]);
   const[showAdd,setShowAdd]=useState(false);
@@ -510,40 +390,6 @@ function App(){
 
         {tab===0&&(
           <div>
-            <div style={{fontSize:11,color:"#6b6b68",marginBottom:12}}>9:00 start daily · Tue 1 Apr + Sat tutoring · Sat only from week 2</div>
-            {Object.entries(TT).map(([day,blocks])=>{
-              const isTutor=day.includes("tutor");
-              const doneCount=blocks.filter((_,i)=>doneTasks[day+"-"+i]).length;
-              return(
-                <div key={day} style={{background:"#fff",border:"0.5px solid "+(isTutor?"#85B7EB":"#e8e8e4"),borderRadius:12,padding:"11px 14px",marginBottom:8}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                    <div style={{fontSize:13,fontWeight:500}}>{day}</div>
-                    <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      {isTutor&&<span style={{fontSize:10,fontWeight:500,padding:"2px 7px",borderRadius:5,background:"#E6F1FB",color:"#0C447C",border:"0.5px solid #85B7EB"}}>tutoring</span>}
-                      <span style={{fontSize:11,color:"#6b6b68"}}>{doneCount}/{blocks.length}</span>
-                    </div>
-                  </div>
-                  {blocks.map((blk,i)=>{
-                    const key=day+"-"+i;const done=!!doneTasks[key];
-                    const bc=SC(blk.s);const isBreak=blk.s==="Break";
-                    return(
-                      <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:4,paddingBottom:4,borderBottom:i<blocks.length-1?"0.5px solid #e8e8e4":"none",opacity:done?0.4:1}}>
-                        <div style={{fontSize:10,color:"#6b6b68",minWidth:90,paddingTop:2,flexShrink:0}}>{blk.t}</div>
-                        <div style={{flex:1}}>
-                          {!isBreak&&<span style={{fontSize:10,fontWeight:500,padding:"1px 6px",borderRadius:4,background:bc.bg,color:bc.c,border:"0.5px solid "+bc.b,display:"inline-block",marginBottom:2}}>{blk.s}</span>}
-                          <div style={{fontSize:12,color:isBreak?"#6b6b68":"#1a1a18",fontStyle:isBreak?"italic":"normal",lineHeight:1.5}}>{blk.task}</div>
-                        </div>
-                        {!isBreak&&<input type="checkbox" checked={done} onChange={()=>setDoneTasks(d=>({...d,[key]:!d[key]}))} style={{marginTop:2,flexShrink:0}}/>}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {tab===1&&(
           <div>
             <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:12,alignItems:"center"}}>
               {["All","Maths","Further Maths","Computer Science"].map(f=><Chip key={f} label={f} active={ppFilter===f} onClick={()=>setPpFilter(f)}/>)}
