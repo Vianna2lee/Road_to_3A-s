@@ -426,7 +426,7 @@ function AddPaperModal({onAdd, onClose}) {
   const [useCustom,setUseCustom]=useState(false);
   const [bAs,setBAs]=useState(""); const [bA,setBA]=useState(""); const [bB,setBB]=useState("");
   const [customName,setCustomName]=useState("");
-  const paperOpts={"Maths":["Paper 1 (Pure)","Paper 2 (Pure)","Paper 3 (Stats & Mech)","Other"],"Further Maths":["Core Pure 1","Core Pure 2","Further Mech 1","Further Stats 1","Other"],"Computer Science":["H446/01 Computer Systems","H446/02 Algorithms & Programming","Other"]};
+  const paperOpts={"Maths":["Paper 1 (Pure)","Paper 2 (Pure)","Paper 3 (Stats & Mech)","Other"],"Further Maths":["Core Pure 1","Core Pure 2","Further Mech 1","Further Stats 1","Paper 1","Paper 2","Statistics","Mechanics","Other"],"Computer Science":["H446/01 Computer Systems","H446/02 Algorithms & Programming","Paper 1","Paper 2","Other"]};
   const b25ref=((B25[subject]||{})[paper])||null;
   const maxN=parseInt(maxMarks)||0;
   const finalPaper = paper==="Other" ? (customName.trim()||"Other") : paper;
