@@ -1,43 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>A* Revision Hub</title>
-<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-<style>
-  :root {
-    --color-background-primary:#ffffff;--color-background-secondary:#f7f7f5;
-    --color-text-primary:#1a1a18;--color-text-secondary:#6b6b68;--color-text-tertiary:#9b9b98;
-    --color-border-secondary:#d4d4d0;--color-border-tertiary:#e8e8e4;
-    --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  }
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:var(--font-sans);background:#fff;color:#1a1a18;}
-  input,select,textarea,button{font-family:var(--font-sans);}
-</style>
-</head>
-<body>
-<div id="root"><div style="padding:2rem;font-family:sans-serif;color:#666">Loading...</div></div>
-<script type="text/babel">
-const {useState,useEffect,useRef,useCallback}=React;
-const TABS=["Past Papers","Weak Topics"];
-const SUPA_URL="https://wwcwiobbetizfbqwufvt.supabase.co";
-const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3Y3dpb2JiZXRpemZicXd1ZnZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MDAxOTEsImV4cCI6MjA5MDM3NjE5MX0.ma4_zIE5MVnFN38B4QLoz6bzpQSsaZbH-WAwo7lNDv4";
-
-async function loadAll(){
-  try{
-    const r=await window.storage.get("revision_data");
-    return r?JSON.parse(r.value):{};
-  }catch(e){return{};}
-}
-async function saveAll(data){
-  try{
-    await window.storage.set("revision_data",JSON.stringify(data));
-  }catch(e){}
-}
+const { useState, useEffect, useCallback } = React;
 
 const PB={
   "Maths":{
@@ -75,6 +36,13 @@ const BASE_PAPERS=[
   ...[2024,2023,2022,2019].flatMap(y=>["H446/01 Computer Systems","H446/02 Algorithms & Programming"].map((p,i)=>({id:"cs_"+y+"_"+i,subject:"Computer Science",paper:p,year:String(y),pmtUrl:"https://www.physicsandmathstutor.com/a-level-computer-science/ocr/past-papers/"}))),
 ];
 
+const ALL_PAPER_OPTS=[
+  "Paper 1 (Pure)","Paper 2 (Pure)","Paper 3 (Stats & Mech)",
+  "Core Pure 1","Core Pure 2","Further Stats 1","Further Mech 1",
+  "H446/01 Computer Systems","H446/02 Algorithms & Programming",
+  "Other"
+];
+
 function getBoundary(subject,paper,year){return((PB[subject]||{})[paper]||{})[parseInt(year)]||null;}
 function gradeLabel(score,b){
   if(!b)return null;const s=parseInt(score);if(isNaN(s))return null;
@@ -99,7 +67,6 @@ function PaperRow({p,data,onChange,onRemove}){
   const col=gl?gl.c:"#B4B2A9";
   const TS={...IS,fontSize:12,minHeight:70,resize:"vertical"};
   const displayName=p.displayPaper||p.paper;
-
   return(
     <div style={{borderTop:"0.5px solid #e8e8e4"}}>
       <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px",cursor:"pointer",background:open?"#f7f7f5":"transparent",userSelect:"none"}} onClick={()=>setOpen(o=>!o)}>
@@ -126,16 +93,16 @@ function PaperRow({p,data,onChange,onRemove}){
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
                 {[{l:"A*",v:b.as,c:"#0F6E56"},{l:"A",v:b.a,c:"#185FA5"},{l:"B",v:b.b,c:"#854F0B"}].map(({l,v,c})=>{
                   if(v===null)return null;const met=sc>=v;
-                  return<span key={l} style={{fontSize:10,padding:"2px 8px",borderRadius:5,color:met?c:"#6b6b68",background:met?c+"22":"#fff",border:"0.5px solid "+(met?c:"#e8e8e4")}}>{l} {v}/{b.max} ({pct(v,b.max)}%) {met?"✓":""}</span>;
+                  return <span key={l} style={{fontSize:10,padding:"2px 8px",borderRadius:5,color:met?c:"#6b6b68",background:met?c+"22":"#fff",border:"0.5px solid "+(met?c:"#e8e8e4")}}>{l} {v}/{b.max} ({pct(v,b.max)}%) {met?"✓":""}</span>;
                 })}
               </div>
-              {b25&&<><div style={{fontSize:11,color:"#6b6b68",marginBottom:5}}>vs 2025 boundaries</div>
+              {b25&&(<><div style={{fontSize:11,color:"#6b6b68",marginBottom:5}}>vs 2025 boundaries</div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                 {[{l:"A*",v:b25.as,c:"#0F6E56"},{l:"A",v:b25.a,c:"#185FA5"},{l:"B",v:b25.b,c:"#854F0B"}].map(({l,v,c})=>{
                   const met=sc>=v;
-                  return<span key={l} style={{fontSize:10,padding:"2px 8px",borderRadius:5,color:met?c:"#6b6b68",background:met?c+"22":"#fff",border:"0.5px solid "+(met?c:"#e8e8e4")}}>{l} {v}/{b25.max} ({pct(v,b25.max)}%) {met?"✓":""}</span>;
+                  return <span key={l} style={{fontSize:10,padding:"2px 8px",borderRadius:5,color:met?c:"#6b6b68",background:met?c+"22":"#fff",border:"0.5px solid "+(met?c:"#e8e8e4")}}>{l} {v}/{b25.max} ({pct(v,b25.max)}%) {met?"✓":""}</span>;
                 })}
-              </div></>}
+              </div></>)}
             </div>
           )}
           <div style={{display:"flex",borderBottom:"0.5px solid #e8e8e4",marginBottom:10}}>
@@ -178,7 +145,7 @@ function YearBlock({year,papers,subject,paperData,onChange,onRemove}){
 
 function AllInsights({allPapers,paperData}){
   const done=allPapers.filter(p=>paperData[p.id]?.grade);
-  if(!done.length)return<div style={{padding:"32px",textAlign:"center",color:"#6b6b68",fontSize:13,border:"0.5px solid #e8e8e4",borderRadius:12}}>No results yet — go to a subject tab, open a year, and enter your score.</div>;
+  if(!done.length)return <div style={{padding:"32px",textAlign:"center",color:"#6b6b68",fontSize:13,border:"0.5px solid #e8e8e4",borderRadius:12}}>No results yet — select a subject, open a year, and enter your score.</div>;
   const gc=l=>l==="A*"?"#0F6E56":l==="A"?"#185FA5":l==="B"?"#854F0B":"#A32D2D";
   const bySubj={};
   done.forEach(p=>{if(!bySubj[p.subject])bySubj[p.subject]=[];bySubj[p.subject].push(p);});
@@ -253,20 +220,13 @@ function AddPaperModal({onAdd,onClose,defaultSubject}){
   const[label,setLabel]=useState("");
   const[customName,setCustomName]=useState("");
   const[useCustom,setUseCustom]=useState(false);
-  const[bAs,setBAs]=useState("");const[bA,setBA]=useState("");const[bB,setBB]=useState("");
-
-  const paperOpts={
-    "Maths":["Paper 1 (Pure)","Paper 2 (Pure)","Paper 3 (Stats & Mech)","Other"],
-    "Further Maths":["Core Pure 1","Core Pure 2","Further Stats 1","Further Mech 1","Other"],
-    "Computer Science":["H446/01 Computer Systems","H446/02 Algorithms & Programming","Other"],
-    "All":["Paper 1 (Pure)","Paper 2 (Pure)","Paper 3 (Stats & Mech)","Core Pure 1","Core Pure 2","Further Stats 1","Further Mech 1","H446/01 Computer Systems","H446/02 Algorithms & Programming","Other"],
-  };
-
+  const[bAs,setBAs]=useState("");
+  const[bA,setBA]=useState("");
+  const[bB,setBB]=useState("");
   const b25ref=((B25[subject]||{})[paper])||null;
   const maxN=parseInt(maxMarks)||0;
   const finalPaper=paper==="Other"?(customName.trim()||"Other"):paper;
   const displayPaper=label.trim()?`${finalPaper} (${label.trim()})`:finalPaper;
-
   function handleAdd(){
     if(!paper||!year.trim()||!maxMarks)return;
     let cb;
@@ -276,19 +236,18 @@ function AddPaperModal({onAdd,onClose,defaultSubject}){
     onAdd({id:"custom_"+Date.now(),subject,paper:finalPaper,displayPaper,year:year.trim(),customBoundary:cb,pmtUrl:""});
     onClose();
   }
-
   return(
     <div style={{background:"#fff",border:"0.5px solid #85B7EB",borderRadius:12,padding:"16px",marginBottom:12}}>
       <div style={{fontSize:13,fontWeight:500,marginBottom:12}}>Add a custom paper</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
         <div><label style={{fontSize:11,color:"#6b6b68",display:"block",marginBottom:4}}>Subject</label>
-          <select style={IS} value={subject} onChange={e=>{setSubject(e.target.value);setPaper("");setLabel("");setCustomName("");}}>
+          <select style={IS} value={subject} onChange={e=>setSubject(e.target.value)}>
             {["Maths","Further Maths","Computer Science"].map(o=><option key={o} value={o}>{o}</option>)}
           </select></div>
         <div><label style={{fontSize:11,color:"#6b6b68",display:"block",marginBottom:4}}>Paper</label>
           <select style={IS} value={paper} onChange={e=>{setPaper(e.target.value);setCustomName("");}}>
             <option value="">Select...</option>
-            {(paperOpts["All"]||[]).map(o=><option key={o}>{o}</option>)}
+            {ALL_PAPER_OPTS.map(o=><option key={o} value={o}>{o}</option>)}
           </select>
           {paper==="Other"&&<input style={{...IS,marginTop:6}} placeholder="Paper name" value={customName} onChange={e=>setCustomName(e.target.value)}/>}
         </div>
@@ -296,7 +255,7 @@ function AddPaperModal({onAdd,onClose,defaultSubject}){
           <input style={IS} placeholder="e.g. 2025" value={year} onChange={e=>setYear(e.target.value)}/></div>
         <div><label style={{fontSize:11,color:"#6b6b68",display:"block",marginBottom:4}}>Total marks</label>
           <input type="number" style={IS} placeholder="e.g. 100" value={maxMarks} onChange={e=>setMaxMarks(e.target.value)}/></div>
-        <div style={{gridColumn:"1 / -1"}}><label style={{fontSize:11,color:"#6b6b68",display:"block",marginBottom:4}}>Label <span style={{fontWeight:400,color:"#9b9b98"}}>(optional — e.g. PMT, Mock, School)</span></label>
+        <div style={{gridColumn:"1 / -1"}}><label style={{fontSize:11,color:"#6b6b68",display:"block",marginBottom:4}}>Label <span style={{fontWeight:400,color:"#9b9b98"}}>(optional)</span></label>
           <input style={IS} placeholder="e.g. PMT Set A" value={label} onChange={e=>setLabel(e.target.value)}/></div>
       </div>
       <div style={{marginBottom:12}}>
@@ -312,10 +271,11 @@ function AddPaperModal({onAdd,onClose,defaultSubject}){
           {[["A*",bAs,setBAs],["A",bA,setBA],["B",bB,setBB]].map(([l,v,s])=>(
             <div key={l}><label style={{fontSize:10,color:"#6b6b68",display:"block",marginBottom:3}}>{l}</label>
               <input type="number" style={IS} placeholder={l} value={v} onChange={e=>s(e.target.value)}/></div>
-          ))}</div>}
+          ))}
+        </div>}
       </div>
       <div style={{display:"flex",gap:8}}>
-        <button onClick={handleAdd} disabled={!paper||!year||!maxMarks} style={{fontSize:12,padding:"6px 16px",borderRadius:7,border:"none",background:!paper||!year||!maxMarks?"#ccc":"#0F6E56",color:"white",cursor:!paper||!year||!maxMarks?"default":"pointer"}}>Add Paper</button>
+        <button onClick={handleAdd} disabled={!paper||!year||!maxMarks} style={{fontSize:12,padding:"6px 16px",borderRadius:7,border:"none",background:(!paper||!year||!maxMarks)?"#ccc":"#0F6E56",color:"white",cursor:(!paper||!year||!maxMarks)?"default":"pointer"}}>Add Paper</button>
         <button onClick={onClose} style={{fontSize:12,padding:"6px 16px",borderRadius:7,border:"0.5px solid #e8e8e4",background:"transparent",color:"#6b6b68",cursor:"pointer"}}>Cancel</button>
       </div>
     </div>
@@ -332,17 +292,29 @@ function App(){
   const[ppFilter,setPpFilter]=useState("All");
 
   useEffect(()=>{
-    loadAll().then(saved=>{
-      if(saved.paperData)setPaperData(saved.paperData);
-      if(saved.doneTopics)setDoneTopics(saved.doneTopics);
-      if(saved.customPapers)setCustomPapers(saved.customPapers);
+    const timeout=setTimeout(()=>setReady(true),3000);
+    async function load(){
+      try{
+        const r=await window.storage.get("revision_data");
+        if(r){
+          const saved=JSON.parse(r.value);
+          if(saved.paperData)setPaperData(saved.paperData);
+          if(saved.doneTopics)setDoneTopics(saved.doneTopics);
+          if(saved.customPapers)setCustomPapers(saved.customPapers);
+        }
+      }catch(e){}
+      clearTimeout(timeout);
       setReady(true);
-    });
+    }
+    load();
   },[]);
 
   useEffect(()=>{
     if(!ready)return;
-    saveAll({paperData,doneTopics,customPapers});
+    async function save(){
+      try{await window.storage.set("revision_data",JSON.stringify({paperData,doneTopics,customPapers}));}catch(e){}
+    }
+    save();
   },[paperData,doneTopics,customPapers,ready]);
 
   const updatePaper=useCallback((id,data)=>setPaperData(prev=>({...prev,[id]:data})),[]);
@@ -363,21 +335,20 @@ function App(){
     <button onClick={onClick} style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:"0.5px solid "+(active?"#85B7EB":"#e8e8e4"),background:active?"#E6F1FB":"transparent",color:active?"#0C447C":"#6b6b68",cursor:"pointer"}}>{label}</button>
   );
 
-  if(!ready)return<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"200px",color:"#6b6b68",fontSize:13}}>Loading your saved data...</div>;
+  if(!ready)return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"200px",color:"#6b6b68",fontSize:13}}>Loading...</div>;
 
   return(
     <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",maxWidth:920,margin:"0 auto"}}>
       <div style={{padding:"1rem 1rem 0"}}>
         <div style={{fontSize:17,fontWeight:500}}>A* Revision Hub</div>
-        <div style={{fontSize:11,color:"#6b6b68"}}>Edexcel Maths &amp; Further Maths (FM1+FS1) · OCR CS H446 · Summer 2026 · Synced to cloud</div>
+        <div style={{fontSize:11,color:"#6b6b68"}}>Edexcel Maths & Further Maths · OCR CS H446 · Summer 2026</div>
       </div>
       <div style={{display:"flex",gap:2,padding:"0.75rem 1rem 0",borderBottom:"0.5px solid #e8e8e4",overflowX:"auto"}}>
-        {TABS.map((t,i)=>(
+        {["Past Papers","Weak Topics"].map((t,i)=>(
           <button key={i} onClick={()=>setTab(i)} style={{fontSize:12,fontWeight:tab===i?500:400,padding:"6px 13px",borderRadius:"6px 6px 0 0",border:"0.5px solid",borderBottom:tab===i?"none":"transparent",cursor:"pointer",whiteSpace:"nowrap",background:tab===i?"#fff":"transparent",borderColor:tab===i?"#d4d4d0":"transparent",color:tab===i?"#1a1a18":"#6b6b68",marginBottom:tab===i?-1:0}}>{t}</button>
         ))}
       </div>
       <div style={{padding:"1rem"}}>
-
         {tab===0&&(
           <div>
             <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:12,alignItems:"center"}}>
@@ -398,7 +369,6 @@ function App(){
             })()}
           </div>
         )}
-
         {tab===1&&(
           <div>
             {weakRows.length===0?(
@@ -424,13 +394,9 @@ function App(){
             )}
           </div>
         )}
-
       </div>
     </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
-</script>
-</body>
-</html>
+export default App;
