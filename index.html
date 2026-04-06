@@ -29,23 +29,15 @@ const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 async function loadAll(){
   try{
-    const r=await fetch(`${SUPA_URL}/rest/v1/revision_data?id=eq.main&select=data`,{headers:{"apikey":SUPA_KEY,"Authorization":`Bearer ${SUPA_KEY}`}});
-    const rows=await r.json();
-    return(rows&&rows[0]&&rows[0].data)?rows[0].data:{};
+    const r=await window.storage.get("revision_data");
+    return r?JSON.parse(r.value):{};
   }catch(e){return{};}
 }
 async function saveAll(data){
   try{
-    await fetch(`${SUPA_URL}/rest/v1/revision_data?id=eq.main`,{method:"PATCH",headers:{"apikey":SUPA_KEY,"Authorization":`Bearer ${SUPA_KEY}`,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({data,updated_at:new Date().toISOString()})});
+    await window.storage.set("revision_data",JSON.stringify(data));
   }catch(e){}
 }
-
-const SC=s=>({
-  "Further Maths":{bg:"#E1F5EE",c:"#085041",b:"#5DCAA5"},
-  "Maths":{bg:"#E6F1FB",c:"#0C447C",b:"#85B7EB"},
-  "Computer Science":{bg:"#FAEEDA",c:"#633806",b:"#EF9F27"},
-  "Break":{bg:"#F1EFE8",c:"#888",b:"#ccc"},
-}[s]||{bg:"#F1EFE8",c:"#444",b:"#B4B2A9"});
 
 const PB={
   "Maths":{
@@ -82,8 +74,6 @@ const BASE_PAPERS=[
   ...[2024,2023,2022,2019].flatMap(y=>["Core Pure 1","Core Pure 2","Further Mech 1","Further Stats 1"].map((p,i)=>({id:"fm_"+y+"_"+i,subject:"Further Maths",paper:p,year:String(y),pmtUrl:"https://www.physicsandmathstutor.com/maths-revision/a-level-edexcel/papers-further/"}))),
   ...[2024,2023,2022,2019].flatMap(y=>["H446/01 Computer Systems","H446/02 Algorithms & Programming"].map((p,i)=>({id:"cs_"+y+"_"+i,subject:"Computer Science",paper:p,year:String(y),pmtUrl:"https://www.physicsandmathstutor.com/a-level-computer-science/ocr/past-papers/"}))),
 ];
-
-
 
 function getBoundary(subject,paper,year){return((PB[subject]||{})[paper]||{})[parseInt(year)]||null;}
 function gradeLabel(score,b){
@@ -255,8 +245,8 @@ function AllInsights({allPapers,paperData}){
   );
 }
 
-function AddPaperModal({onAdd,onClose}){
-  const[subject,setSubject]=useState("Maths");
+function AddPaperModal({onAdd,onClose,defaultSubject}){
+  const[subject,setSubject]=useState(defaultSubject||"Maths");
   const[paper,setPaper]=useState("");
   const[year,setYear]=useState("");
   const[maxMarks,setMaxMarks]=useState("");
@@ -267,8 +257,9 @@ function AddPaperModal({onAdd,onClose}){
 
   const paperOpts={
     "Maths":["Paper 1 (Pure)","Paper 2 (Pure)","Paper 3 (Stats & Mech)","Other"],
-    "Further Maths":["Core Pure 1","Core Pure 2","Further Mech 1","Further Stats 1","Paper 1","Paper 2","Statistics","Mechanics","Other"],
-    "Computer Science":["H446/01 Computer Systems","H446/02 Algorithms & Programming","Paper 1","Paper 2","Other"],
+    "Further Maths":["Core Pure 1","Core Pure 2","Further Stats 1","Further Mech 1","Other"],
+    "Computer Science":["H446/01 Computer Systems","H446/02 Algorithms & Programming","Other"],
+    "All":["Paper 1 (Pure)","Paper 2 (Pure)","Paper 3 (Stats & Mech)","Core Pure 1","Core Pure 2","Further Stats 1","Further Mech 1","H446/01 Computer Systems","H446/02 Algorithms & Programming","Other"],
   };
 
   const b25ref=((B25[subject]||{})[paper])||null;
@@ -292,12 +283,12 @@ function AddPaperModal({onAdd,onClose}){
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
         <div><label style={{fontSize:11,color:"#6b6b68",display:"block",marginBottom:4}}>Subject</label>
           <select style={IS} value={subject} onChange={e=>{setSubject(e.target.value);setPaper("");setLabel("");setCustomName("");}}>
-            {["Maths","Further Maths","Computer Science"].map(o=><option key={o}>{o}</option>)}
+            {["Maths","Further Maths","Computer Science"].map(o=><option key={o} value={o}>{o}</option>)}
           </select></div>
         <div><label style={{fontSize:11,color:"#6b6b68",display:"block",marginBottom:4}}>Paper</label>
           <select style={IS} value={paper} onChange={e=>{setPaper(e.target.value);setCustomName("");}}>
             <option value="">Select...</option>
-            {(paperOpts[subject]||[]).map(o=><option key={o}>{o}</option>)}
+            {(paperOpts["All"]||[]).map(o=><option key={o}>{o}</option>)}
           </select>
           {paper==="Other"&&<input style={{...IS,marginTop:6}} placeholder="Paper name" value={customName} onChange={e=>setCustomName(e.target.value)}/>}
         </div>
@@ -343,7 +334,6 @@ function App(){
   useEffect(()=>{
     loadAll().then(saved=>{
       if(saved.paperData)setPaperData(saved.paperData);
-      if(saved.doneTasks)setDoneTasks(saved.doneTasks);
       if(saved.doneTopics)setDoneTopics(saved.doneTopics);
       if(saved.customPapers)setCustomPapers(saved.customPapers);
       setReady(true);
@@ -352,8 +342,8 @@ function App(){
 
   useEffect(()=>{
     if(!ready)return;
-    saveAll({paperData,doneTasks,doneTopics,customPapers});
-  },[paperData,doneTasks,doneTopics,customPapers,ready]);
+    saveAll({paperData,doneTopics,customPapers});
+  },[paperData,doneTopics,customPapers,ready]);
 
   const updatePaper=useCallback((id,data)=>setPaperData(prev=>({...prev,[id]:data})),[]);
   const removePaper=useCallback(id=>setCustomPapers(prev=>prev.filter(p=>p.id!==id)),[]);
@@ -390,12 +380,11 @@ function App(){
 
         {tab===0&&(
           <div>
-          <div>
             <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:12,alignItems:"center"}}>
               {["All","Maths","Further Maths","Computer Science"].map(f=><Chip key={f} label={f} active={ppFilter===f} onClick={()=>setPpFilter(f)}/>)}
               <button onClick={()=>setShowAdd(o=>!o)} style={{marginLeft:"auto",fontSize:11,padding:"4px 12px",borderRadius:6,border:"0.5px solid #185FA5",background:"#E6F1FB",color:"#0C447C",cursor:"pointer"}}>+ Add paper</button>
             </div>
-            {showAdd&&<AddPaperModal onAdd={p=>{setCustomPapers(prev=>[...prev,p]);setShowAdd(false);}} onClose={()=>setShowAdd(false)}/>}
+            {showAdd&&<AddPaperModal defaultSubject={ppFilter==="All"?"Maths":ppFilter} onAdd={p=>{setCustomPapers(prev=>[...prev,p]);setShowAdd(false);}} onClose={()=>setShowAdd(false)}/>}
             {ppFilter==="All"&&<AllInsights allPapers={allPapers} paperData={paperData}/>}
             {ppFilter!=="All"&&(()=>{
               const papers=filtered.filter(p=>p.subject===ppFilter);
@@ -410,7 +399,7 @@ function App(){
           </div>
         )}
 
-        {tab===2&&(
+        {tab===1&&(
           <div>
             {weakRows.length===0?(
               <div style={{padding:"32px",textAlign:"center",color:"#6b6b68",fontSize:13,border:"0.5px solid #e8e8e4",borderRadius:12}}>
