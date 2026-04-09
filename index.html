@@ -94,7 +94,6 @@ function span(attrs,children){return el("span",attrs,children);}
 function btn(attrs,children){return el("button",attrs,children);}
 function inp(attrs){return el("input",attrs);}
 
-// State
 let state={
   tab:0,
   ppFilter:"All",
@@ -121,7 +120,6 @@ function setState(patch){
 
 function allPapers(){return[...BASE_PAPERS,...state.customPapers];}
 
-// ---- RENDER ----
 function render(){
   const app=document.getElementById("app");
   app.innerHTML="";
@@ -154,7 +152,6 @@ function buildApp(){
 function buildPastPapers(papers,filtered){
   const wrap=div({});
 
-  // filter chips + add button
   const chipRow=div({style:{display:"flex",gap:"4px",flexWrap:"wrap",marginBottom:"12px",alignItems:"center"}});
   ["All","Maths","Further Maths","Computer Science"].forEach(f=>{
     chipRow.appendChild(btn({class:"chip"+(state.ppFilter===f?" active":""),onClick:()=>setState({ppFilter:f,showAdd:false})},f));
@@ -236,15 +233,19 @@ function buildPaperRow(p){
   if(open){
     const body=div({style:{padding:"14px",background:"#f7f7f5",borderTop:"0.5px solid #e8e8e4"}});
 
-    // Score + date
     const grid=div({style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"12px"}});
+
+    // FIX: score input uses blur to re-render, not input — prevents DOM destruction mid-type
     const scoreInp=inp({type:"number",class:"is",placeholder:"e.g. 78",value:d.grade||""});
     scoreInp.addEventListener("input",e=>{
-      const pd={...state.paperData,[p.id]:{...(state.paperData[p.id]||{}),grade:e.target.value}};
-      state.paperData=pd;schedSave();render();
+      if(!state.paperData[p.id]) state.paperData[p.id]={};
+      state.paperData[p.id].grade=e.target.value;
+      schedSave();
     });
+    scoreInp.addEventListener("blur",()=>render());
+
     const dateInp=inp({type:"date",class:"is",value:d.dateDone||""});
-    dateInp.addEventListener("input",e=>{
+    dateInp.addEventListener("change",e=>{
       const pd={...state.paperData,[p.id]:{...(state.paperData[p.id]||{}),dateDone:e.target.value}};
       state.paperData=pd;schedSave();render();
     });
@@ -252,13 +253,12 @@ function buildPaperRow(p){
     grid.appendChild(div({},[el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Date done"),dateInp]));
     body.appendChild(grid);
 
-    // Boundaries
     if(sc!==null&&b){
       const bDiv=div({style:{marginBottom:"12px"}});
       const bar=div({style:{height:"7px",borderRadius:"4px",background:"#e8e8e4",overflow:"hidden",marginBottom:"8px"}});
       bar.appendChild(div({style:{height:"100%",width:Math.min(sp,100)+"%",background:col,borderRadius:"4px"}}));
       bDiv.appendChild(bar);
-      bDiv.appendChild(div({style:{fontSize:"11px",color:"#6b6b68",marginBottom:"5px"}},year+" boundaries"+(b.as===null?" (no A* published)":"")));
+      bDiv.appendChild(div({style:{fontSize:"11px",color:"#6b6b68",marginBottom:"5px"}},p.year+" boundaries"+(b.as===null?" (no A* published)":"")));
       const bRow=div({style:{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"10px"}});
       [{l:"A*",v:b.as,c:"#0F6E56"},{l:"A",v:b.a,c:"#185FA5"},{l:"B",v:b.b,c:"#854F0B"}].forEach(({l,v,c})=>{
         if(v===null)return;const met=sc>=v;
@@ -277,7 +277,6 @@ function buildPaperRow(p){
       body.appendChild(bDiv);
     }
 
-    // Subtabs
     const subtab=state.paperSubtabs[p.id]||"wrong";
     const stRow=div({style:{display:"flex",borderBottom:"0.5px solid #e8e8e4",marginBottom:"10px"}});
     ["wrong","notes"].forEach(t=>{
@@ -290,10 +289,17 @@ function buildPaperRow(p){
 
     const ta=el("textarea",{class:"is",placeholder:subtab==="wrong"?"e.g. circle theorems, integration by parts...":"Notes about this paper..."},
       subtab==="wrong"?(d.wrongTopics||""):(d.notes||""));
-    ta.addEventListener("input",e=>{
+    ta.addEventListener("blur",e=>{
       const key=subtab==="wrong"?"wrongTopics":"notes";
       const pd={...state.paperData,[p.id]:{...(state.paperData[p.id]||{}),[key]:e.target.value}};
-      state.paperData=pd;schedSave();
+      state.paperData=pd;schedSave();render();
+    });
+    // Keep textarea value in sync without re-rendering
+    ta.addEventListener("input",e=>{
+      const key=subtab==="wrong"?"wrongTopics":"notes";
+      if(!state.paperData[p.id]) state.paperData[p.id]={};
+      state.paperData[p.id][key]=e.target.value;
+      schedSave();
     });
     body.appendChild(ta);
     wrap.appendChild(body);
@@ -397,13 +403,11 @@ function buildAddModal(){
 
   const grid=div({style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"12px"}});
 
-  // Subject
   const subjSel=el("select",{class:"is"});
   ["Maths","Further Maths","Computer Science"].forEach(o=>{const opt=el("option",{value:o},o);if(o===f.subject)opt.selected=true;subjSel.appendChild(opt);});
   subjSel.addEventListener("change",e=>setState({addForm:{...f,subject:e.target.value}}));
   grid.appendChild(div({},[el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Subject"),subjSel]));
 
-  // Paper
   const paperSel=el("select",{class:"is"});
   [el("option",{value:""},"Select..."),...ALL_PAPER_OPTS.map(o=>{const opt=el("option",{value:o},o);if(o===f.paper)opt.selected=true;return opt;})].forEach(o=>paperSel.appendChild(o));
   paperSel.addEventListener("change",e=>setState({addForm:{...f,paper:e.target.value,customName:""}}));
@@ -415,17 +419,14 @@ function buildAddModal(){
   }
   grid.appendChild(paperDiv);
 
-  // Year
   const yi=inp({type:"text",class:"is",placeholder:"e.g. 2025",value:f.year});
   yi.addEventListener("input",e=>setState({addForm:{...f,year:e.target.value}}));
   grid.appendChild(div({},[el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Year"),yi]));
 
-  // Max marks
   const mi=inp({type:"number",class:"is",placeholder:"e.g. 100",value:f.maxMarks});
   mi.addEventListener("input",e=>setState({addForm:{...f,maxMarks:e.target.value}}));
   grid.appendChild(div({},[el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Total marks"),mi]));
 
-  // Label
   const li=inp({type:"text",class:"is",placeholder:"e.g. PMT Set A",value:f.label});
   li.addEventListener("input",e=>setState({addForm:{...f,label:e.target.value}}));
   const ld=div({style:{gridColumn:"1 / -1"}});
@@ -434,7 +435,6 @@ function buildAddModal(){
   grid.appendChild(ld);
   wrap.appendChild(grid);
 
-  // Boundaries
   const bDiv=div({style:{marginBottom:"12px"}});
   bDiv.appendChild(div({style:{fontSize:"11px",color:"#6b6b68",marginBottom:"6px"}},"Grade boundaries"));
   const bRow=div({style:{display:"flex",gap:"8px",marginBottom:"8px",flexWrap:"wrap"}});
@@ -484,7 +484,6 @@ function buildAddModal(){
   return wrap;
 }
 
-// ---- INIT ----
 dbLoad().then(saved=>{
   if(saved.paperData)state.paperData=saved.paperData;
   if(saved.doneTopics)state.doneTopics=saved.doneTopics;
