@@ -103,36 +103,45 @@ let state={
   addForm:{subject:"Maths",paper:"",year:"",maxMarks:"",label:"",customName:"",useCustom:false,bAs:"",bA:"",bB:""},
 };
 let saveTimer=null;
-// True while any text input / textarea has focus — blocks full re-render
-let anyFocused=false;
 
 function schedSave(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>dbSave({paperData:state.paperData,doneTopics:state.doneTopics,customPapers:state.customPapers}),1200);
 }
-// Use for navigation / toggle actions that are safe to re-render immediately
+
+// Hard re-render (navigation, toggles — never called from text input handlers)
 function setState(patch){Object.assign(state,patch);render();}
-// Use after mutating state directly; skips render if user is typing
-function softUpdate(){if(!anyFocused)render();}
 
 function allPapers(){return[...BASE_PAPERS,...state.customPapers];}
 
-// Wrap every text/number/textarea with focus guards so render() never fires mid-type.
-// onInput  : writes to state (no render)
-// onCommit : called on blur after anyFocused cleared — triggers render
-function liveInput(attrs, onInput, onCommit){
-  const e=inp(attrs);
-  e.addEventListener("focus",()=>{anyFocused=true;});
-  e.addEventListener("input",ev=>{onInput(ev.target.value);schedSave();});
-  e.addEventListener("blur",()=>{anyFocused=false;if(onCommit)onCommit();render();});
-  return e;
+// ── The ONLY correct way to handle text inputs in a innerHTML-based renderer ──
+// Never re-render while focus is inside #app. On blur, wait one tick so the
+// browser can move focus to the next element first, then only re-render if
+// focus has left all managed inputs entirely.
+const FIELD_SELECTOR='input,textarea';
+function isAppFocused(){
+  const a=document.activeElement;
+  return a&&document.getElementById("app").contains(a)&&(a.matches(FIELD_SELECTOR));
 }
-function liveTextarea(attrs, initVal, onInput, onCommit){
-  const e=el("textarea",attrs,[initVal]);
-  e.addEventListener("focus",()=>{anyFocused=true;});
-  e.addEventListener("input",ev=>{onInput(ev.target.value);schedSave();});
-  e.addEventListener("blur",()=>{anyFocused=false;if(onCommit)onCommit();render();});
-  return e;
+
+function attachLive(element, onInput){
+  // onInput(val) — mutate state directly, no render
+  element.addEventListener("input", e=>{
+    onInput(e.target.value);
+    schedSave();
+  });
+  element.addEventListener("blur", ()=>{
+    // Wait one tick — if focus moved to another input inside app, don't render
+    setTimeout(()=>{ if(!isAppFocused()) render(); }, 0);
+  });
+  return element;
+}
+
+function liveInp(attrs, onInput){
+  return attachLive(inp(attrs), onInput);
+}
+function liveTa(attrs, initVal, onInput){
+  return attachLive(el("textarea", attrs, [initVal]), onInput);
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
@@ -236,13 +245,10 @@ function buildPaperRow(p){
 
   const body=div({style:{padding:"14px",background:"#f7f7f5",borderTop:"0.5px solid #e8e8e4"}});
 
-  // Score — writes directly to state on input, re-renders only on blur
-  const scoreInp=liveInput(
+  const scoreInp=liveInp(
     {type:"number",class:"is",placeholder:"e.g. 78",value:d.grade||""},
     val=>{if(!state.paperData[p.id])state.paperData[p.id]={};state.paperData[p.id].grade=val;}
   );
-
-  // Date — change fires once so safe to render immediately
   const dateInp=inp({type:"date",class:"is",value:d.dateDone||""});
   dateInp.addEventListener("change",e=>{
     if(!state.paperData[p.id])state.paperData[p.id]={};
@@ -284,18 +290,18 @@ function buildPaperRow(p){
   ["wrong","notes"].forEach(t=>{
     const active=subtab===t;
     stRow.appendChild(btn({style:{fontSize:"11px",padding:"5px 14px",background:"transparent",border:"none",borderBottom:active?"2px solid #185FA5":"2px solid transparent",color:active?"#0C447C":"#6b6b68",cursor:"pointer"},
-      onClick:()=>{const pt={...state.paperSubtabs,[p.id]:t};state.paperSubtabs=pt;render();}
+      onClick:()=>{state.paperSubtabs={...state.paperSubtabs,[p.id]:t};render();}
     },t==="wrong"?"Topics Wrong":"Notes"));
   });
   body.appendChild(stRow);
 
   const taKey=subtab==="wrong"?"wrongTopics":"notes";
-  const ta=liveTextarea(
+  body.appendChild(liveTa(
     {class:"is",placeholder:subtab==="wrong"?"e.g. circle theorems, integration by parts...":"Notes about this paper..."},
     d[taKey]||"",
     val=>{if(!state.paperData[p.id])state.paperData[p.id]={};state.paperData[p.id][taKey]=val;}
-  );
-  body.appendChild(ta);
+  ));
+
   wrap.appendChild(body);
   return wrap;
 }
@@ -381,9 +387,6 @@ function buildWeakTopics(papers){
   return wrap;
 }
 
-// ── Add Modal ───────────────────────────────────────────────────────────────
-// All text inputs mutate state.addForm directly on input; re-render on blur.
-// Selects still use setState (they fire once, not on every keystroke).
 function buildAddModal(){
   const f=state.addForm;
   const b25ref=((B25[f.subject]||{})[f.paper])||null;
@@ -394,49 +397,37 @@ function buildAddModal(){
 
   const grid=div({style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"12px"}});
 
-  // Subject select — safe to re-render on change
   const subjSel=el("select",{class:"is"});
-  ["Maths","Further Maths","Computer Science"].forEach(o=>{
-    const opt=el("option",{value:o},o);if(o===f.subject)opt.selected=true;subjSel.appendChild(opt);
-  });
+  ["Maths","Further Maths","Computer Science"].forEach(o=>{const opt=el("option",{value:o},o);if(o===f.subject)opt.selected=true;subjSel.appendChild(opt);});
   subjSel.addEventListener("change",e=>setState({addForm:{...state.addForm,subject:e.target.value}}));
   grid.appendChild(div({},[el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Subject"),subjSel]));
 
-  // Paper select — safe to re-render on change
   const paperSel=el("select",{class:"is"});
-  [el("option",{value:""},"Select..."),...ALL_PAPER_OPTS.map(o=>{
-    const opt=el("option",{value:o},o);if(o===f.paper)opt.selected=true;return opt;
-  })].forEach(o=>paperSel.appendChild(o));
+  [el("option",{value:""},"Select..."),...ALL_PAPER_OPTS.map(o=>{const opt=el("option",{value:o},o);if(o===f.paper)opt.selected=true;return opt;})].forEach(o=>paperSel.appendChild(o));
   paperSel.addEventListener("change",e=>setState({addForm:{...state.addForm,paper:e.target.value,customName:""}}));
   const paperDiv=div({},[el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Paper"),paperSel]);
   if(f.paper==="Other"){
-    paperDiv.appendChild(liveInput(
+    paperDiv.appendChild(liveInp(
       {type:"text",class:"is",placeholder:"Paper name",value:f.customName,style:{marginTop:"6px"}},
       val=>{state.addForm.customName=val;}
     ));
   }
   grid.appendChild(paperDiv);
 
-  // Year
   grid.appendChild(div({},[
     el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Year"),
-    liveInput({type:"text",class:"is",placeholder:"e.g. 2025",value:f.year}, val=>{state.addForm.year=val;}),
+    liveInp({type:"text",class:"is",placeholder:"e.g. 2025",value:f.year}, val=>{state.addForm.year=val;}),
   ]));
-
-  // Max marks
   grid.appendChild(div({},[
     el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Total marks"),
-    liveInput({type:"number",class:"is",placeholder:"e.g. 100",value:f.maxMarks}, val=>{state.addForm.maxMarks=val;}),
+    liveInp({type:"number",class:"is",placeholder:"e.g. 100",value:f.maxMarks}, val=>{state.addForm.maxMarks=val;}),
   ]));
-
-  // Label
   const ld=div({style:{gridColumn:"1 / -1"}});
   ld.appendChild(el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Label (optional)"));
-  ld.appendChild(liveInput({type:"text",class:"is",placeholder:"e.g. PMT Set A",value:f.label}, val=>{state.addForm.label=val;}));
+  ld.appendChild(liveInp({type:"text",class:"is",placeholder:"e.g. PMT Set A",value:f.label}, val=>{state.addForm.label=val;}));
   grid.appendChild(ld);
   wrap.appendChild(grid);
 
-  // Boundaries
   const bDiv=div({style:{marginBottom:"12px"}});
   bDiv.appendChild(div({style:{fontSize:"11px",color:"#6b6b68",marginBottom:"6px"}},"Grade boundaries"));
   const bRow=div({style:{display:"flex",gap:"8px",marginBottom:"8px",flexWrap:"wrap"}});
@@ -456,7 +447,7 @@ function buildAddModal(){
     [["A*","bAs"],["A","bA"],["B","bB"]].forEach(([l,k])=>{
       cg.appendChild(div({},[
         el("label",{style:{fontSize:"10px",color:"#6b6b68",display:"block",marginBottom:"3px"}},l),
-        liveInput({type:"number",class:"is",placeholder:l,value:f[k]}, val=>{state.addForm[k]=val;}),
+        liveInp({type:"number",class:"is",placeholder:l,value:f[k]}, val=>{state.addForm[k]=val;}),
       ]));
     });
     bDiv.appendChild(cg);
