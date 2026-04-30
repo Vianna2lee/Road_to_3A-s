@@ -95,7 +95,7 @@ function btn(a,c){return el("button",a,c);}
 function inp(a){return el("input",a);}
 
 let state={
-  tab:0, ppFilter:"All",
+  tab:0, ppFilter:"All", wtFilter:"All",
   paperData:{}, doneTopics:{}, customPapers:[],
   openYears:{}, openPapers:{}, paperSubtabs:{},
   showAdd:false,
@@ -141,7 +141,7 @@ function buildApp(){
   );
   const content=div({style:{padding:"1rem"}});
   if(state.tab===0)content.appendChild(buildPastPapers(papers,filtered));
-  else content.appendChild(buildWeakTopics(papers));
+  else content.appendChild(buildWeakTopics(allPapers()));
   return div({},[header,tabs,content]);
 }
 
@@ -347,7 +347,7 @@ function buildWeakTopics(papers){
   });
   if(!rows.length)return div({style:{padding:"32px",textAlign:"center",color:"#6b6b68",fontSize:"13px",border:"0.5px solid #e8e8e4",borderRadius:"12px"}},"No weak topics yet. In Past Papers, open a paper and type topics you got wrong.");
 
-  const wtFilter=state.wtFilter||"All";
+  const wtFilter=state.wtFilter;
   const subjects=["All",...new Set(rows.map(r=>r.subject))];
   const filtered=wtFilter==="All"?rows:rows.filter(r=>r.subject===wtFilter);
   const pending=filtered.filter(r=>!state.doneTopics[r.id]);
