@@ -46,8 +46,8 @@ const PB={
     "Further Stats 1":{2024:{as:56,a:48,b:40,max:75},2023:{as:60,a:53,b:43,max:75},2022:{as:59,a:49,b:39,max:75},2019:{as:67,a:56,b:47,max:75}},
   },
   "Computer Science":{
-    "H446/01 Computer Systems":{2024:{as:115,a:101,b:85,max:140},2023:{as:103,a:95,b:75,max:140},2022:{as:100,a:86,b:71,max:140},2019:{as:108,a:94,b:79,max:140}},
-    "H446/02 Algorithms & Programming":{2024:{as:114,a:99,b:83,max:140},2023:{as:120,a:105,b:88,max:140},2022:{as:105,a:98,b:78,max:140},2019:{as:114,a:101,b:86,max:140}},
+    "H446/01 Computer Systems":{2024:{as:107,a:93,b:78,max:140},2023:{as:100,a:87,b:72,max:140},2022:{as:88,a:76,b:62,max:140},2019:{as:108,a:94,b:79,max:140}},
+    "H446/02 Algorithms & Programming":{2024:{as:112,a:97,b:81,max:140},2023:{as:104,a:90,b:74,max:140},2022:{as:93,a:80,b:65,max:140},2019:{as:112,a:97,b:82,max:140}},
   },
 };
 const B25={
@@ -94,7 +94,6 @@ function span(a,c){return el("span",a,c);}
 function btn(a,c){return el("button",a,c);}
 function inp(a){return el("input",a);}
 
-// ── State ──────────────────────────────────────────────────────────────────
 let state={
   tab:0, ppFilter:"All",
   paperData:{}, doneTopics:{}, customPapers:[],
@@ -108,43 +107,22 @@ function schedSave(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>dbSave({paperData:state.paperData,doneTopics:state.doneTopics,customPapers:state.customPapers}),1200);
 }
-
-// Hard re-render (navigation, toggles — never called from text input handlers)
 function setState(patch){Object.assign(state,patch);render();}
-
 function allPapers(){return[...BASE_PAPERS,...state.customPapers];}
 
-// ── The ONLY correct way to handle text inputs in a innerHTML-based renderer ──
-// Never re-render while focus is inside #app. On blur, wait one tick so the
-// browser can move focus to the next element first, then only re-render if
-// focus has left all managed inputs entirely.
 const FIELD_SELECTOR='input,textarea';
 function isAppFocused(){
   const a=document.activeElement;
-  return a&&document.getElementById("app").contains(a)&&(a.matches(FIELD_SELECTOR));
+  return a&&document.getElementById("app").contains(a)&&a.matches(FIELD_SELECTOR);
 }
-
-function attachLive(element, onInput){
-  // onInput(val) — mutate state directly, no render
-  element.addEventListener("input", e=>{
-    onInput(e.target.value);
-    schedSave();
-  });
-  element.addEventListener("blur", ()=>{
-    // Wait one tick — if focus moved to another input inside app, don't render
-    setTimeout(()=>{ if(!isAppFocused()) render(); }, 0);
-  });
+function attachLive(element,onInput){
+  element.addEventListener("input",e=>{onInput(e.target.value);schedSave();});
+  element.addEventListener("blur",()=>{setTimeout(()=>{if(!isAppFocused())render();},0);});
   return element;
 }
+function liveInp(attrs,onInput){return attachLive(inp(attrs),onInput);}
+function liveTa(attrs,initVal,onInput){return attachLive(el("textarea",attrs,[initVal]),onInput);}
 
-function liveInp(attrs, onInput){
-  return attachLive(inp(attrs), onInput);
-}
-function liveTa(attrs, initVal, onInput){
-  return attachLive(el("textarea", attrs, [initVal]), onInput);
-}
-
-// ── Render ─────────────────────────────────────────────────────────────────
 function render(){
   const app=document.getElementById("app");
   app.innerHTML="";
@@ -301,7 +279,6 @@ function buildPaperRow(p){
     d[taKey]||"",
     val=>{if(!state.paperData[p.id])state.paperData[p.id]={};state.paperData[p.id][taKey]=val;}
   ));
-
   wrap.appendChild(body);
   return wrap;
 }
@@ -369,21 +346,51 @@ function buildWeakTopics(papers){
     });
   });
   if(!rows.length)return div({style:{padding:"32px",textAlign:"center",color:"#6b6b68",fontSize:"13px",border:"0.5px solid #e8e8e4",borderRadius:"12px"}},"No weak topics yet. In Past Papers, open a paper and type topics you got wrong.");
+
+  const wtFilter=state.wtFilter||"All";
+  const subjects=["All",...new Set(rows.map(r=>r.subject))];
+  const filtered=wtFilter==="All"?rows:rows.filter(r=>r.subject===wtFilter);
+  const pending=filtered.filter(r=>!state.doneTopics[r.id]);
+  const done=filtered.filter(r=>!!state.doneTopics[r.id]);
+
   const wrap=div({});
-  wrap.appendChild(div({style:{fontSize:"11px",color:"#6b6b68",marginBottom:"10px"}},rows.length+" topic"+(rows.length!==1?"s":"")+" logged"));
-  rows.forEach(t=>{
-    const done=!!state.doneTopics[t.id];
-    const card=div({style:{background:"#fff",border:"0.5px solid "+(done?"#e8e8e4":"#AFA9EC"),borderRadius:"10px",padding:"10px 14px",marginBottom:"6px",opacity:done?"0.5":"1"}});
+
+  // Filter chips
+  const chipRow=div({style:{display:"flex",gap:"4px",flexWrap:"wrap",marginBottom:"12px",alignItems:"center"}});
+  subjects.forEach(s=>{
+    const count=s==="All"?rows.length:rows.filter(r=>r.subject===s).length;
+    chipRow.appendChild(btn({
+      class:"chip"+(wtFilter===s?" active":""),
+      onClick:()=>setState({wtFilter:s})
+    },s+(s!=="All"?" ("+count+")":"")));
+  });
+  wrap.appendChild(chipRow);
+
+  // Summary line
+  wrap.appendChild(div({style:{fontSize:"11px",color:"#6b6b68",marginBottom:"10px"}},
+    pending.length+" pending · "+done.length+" done"+(wtFilter!=="All"?" in "+wtFilter:"")));
+
+  const renderCard=t=>{
+    const isDone=!!state.doneTopics[t.id];
+    const card=div({style:{background:"#fff",border:"0.5px solid "+(isDone?"#e8e8e4":"#AFA9EC"),borderRadius:"10px",padding:"10px 14px",marginBottom:"6px",opacity:isDone?"0.5":"1"}});
     const row=div({style:{display:"flex",alignItems:"center",gap:"8px"}});
     const cb=inp({type:"checkbox"});
-    cb.checked=done;
-    cb.addEventListener("change",()=>{state.doneTopics={...state.doneTopics,[t.id]:!done};schedSave();render();});
+    cb.checked=isDone;
+    cb.addEventListener("change",()=>{state.doneTopics={...state.doneTopics,[t.id]:!isDone};schedSave();render();});
     row.appendChild(cb);
-    row.appendChild(span({style:{fontSize:"13px",fontWeight:500,textDecoration:done?"line-through":"none",flex:1}},t.name));
+    row.appendChild(span({style:{fontSize:"13px",fontWeight:500,textDecoration:isDone?"line-through":"none",flex:1}},t.name));
     row.appendChild(span({style:{fontSize:"10px",color:"#6b6b68"}},t.subject+" · "+t.paper+" "+t.year));
     card.appendChild(row);
-    wrap.appendChild(card);
-  });
+    return card;
+  };
+
+  pending.forEach(t=>wrap.appendChild(renderCard(t)));
+
+  if(done.length){
+    wrap.appendChild(div({style:{fontSize:"11px",color:"#9b9b98",marginTop:"12px",marginBottom:"6px",paddingTop:"8px",borderTop:"0.5px solid #e8e8e4"}},"Completed ("+done.length+")"));
+    done.forEach(t=>wrap.appendChild(renderCard(t)));
+  }
+
   return wrap;
 }
 
@@ -399,14 +406,14 @@ function buildAddModal(){
 
   const subjSel=el("select",{class:"is"});
   ["Maths","Further Maths","Computer Science"].forEach(o=>{const opt=el("option",{value:o},o);if(o===f.subject)opt.selected=true;subjSel.appendChild(opt);});
-  subjSel.addEventListener("change",e=>setState({addForm:{...state.addForm,subject:e.target.value}}));
+  subjSel.addEventListener("change",e=>setState({addForm:{...state.addForm,subject:e.target.value,paper:"",useCustom:false}}));
   grid.appendChild(div({},[el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Subject"),subjSel]));
 
   const paperSel=el("select",{class:"is"});
   [el("option",{value:""},"Select..."),...ALL_PAPER_OPTS.map(o=>{const opt=el("option",{value:o},o);if(o===f.paper)opt.selected=true;return opt;})].forEach(o=>paperSel.appendChild(o));
   paperSel.addEventListener("change",e=>{
     const newPaper=e.target.value;
-    const hasBounds=!!((B25[state.addForm.subject]||{})[newPaper]);
+    const hasBounds=!!((B25[f.subject]||{})[newPaper]);
     setState({addForm:{...state.addForm,paper:newPaper,customName:"",useCustom:!hasBounds}});
   });
   const paperDiv=div({},[el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Paper"),paperSel]);
@@ -420,47 +427,50 @@ function buildAddModal(){
 
   grid.appendChild(div({},[
     el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Year"),
-    liveInp({type:"text",class:"is",placeholder:"e.g. 2025",value:f.year}, val=>{state.addForm.year=val;}),
+    liveInp({type:"text",class:"is",placeholder:"e.g. 2025",value:f.year},val=>{state.addForm.year=val;}),
   ]));
   grid.appendChild(div({},[
     el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Total marks"),
-    liveInp({type:"number",class:"is",placeholder:"e.g. 100",value:f.maxMarks}, val=>{state.addForm.maxMarks=val;}),
+    liveInp({type:"number",class:"is",placeholder:"e.g. 100",value:f.maxMarks},val=>{state.addForm.maxMarks=val;}),
   ]));
   const ld=div({style:{gridColumn:"1 / -1"}});
   ld.appendChild(el("label",{style:{fontSize:"11px",color:"#6b6b68",display:"block",marginBottom:"4px"}},"Label (optional)"));
-  ld.appendChild(liveInp({type:"text",class:"is",placeholder:"e.g. PMT Set A",value:f.label}, val=>{state.addForm.label=val;}));
+  ld.appendChild(liveInp({type:"text",class:"is",placeholder:"e.g. PMT Set A",value:f.label},val=>{state.addForm.label=val;}));
   grid.appendChild(ld);
   wrap.appendChild(grid);
 
   const bDiv=div({style:{marginBottom:"12px"}});
   bDiv.appendChild(div({style:{fontSize:"11px",color:"#6b6b68",marginBottom:"6px"}},"Grade boundaries"));
   const bRow=div({style:{display:"flex",gap:"8px",marginBottom:"8px",flexWrap:"wrap"}});
-  // Only show "Use 2025" toggle when data actually exists for this paper
+
   if(b25ref){
-    // Toggle buttons — only shown when 2025 data exists
+    // Show toggle only when 2025 data exists for this paper
     bRow.appendChild(btn({style:{fontSize:"11px",padding:"4px 12px",borderRadius:"6px",border:"0.5px solid "+(!f.useCustom?"#185FA5":"#e8e8e4"),background:!f.useCustom?"#E6F1FB":"transparent",color:!f.useCustom?"#0C447C":"#6b6b68",cursor:"pointer"},
       onClick:()=>setState({addForm:{...state.addForm,useCustom:false}})
-    },"Use 2025 (A*"+b25ref.as+" A"+b25ref.a+" B"+b25ref.b+"/"+b25ref.max+")"));
+    },"Use 2025"));
     bRow.appendChild(btn({style:{fontSize:"11px",padding:"4px 12px",borderRadius:"6px",border:"0.5px solid "+(f.useCustom?"#185FA5":"#e8e8e4"),background:f.useCustom?"#E6F1FB":"transparent",color:f.useCustom?"#0C447C":"#6b6b68",cursor:"pointer"},
       onClick:()=>setState({addForm:{...state.addForm,useCustom:true}})
     },"Enter manually"));
   }
   bDiv.appendChild(bRow);
-  // Show scaled 2025 preview when "Use 2025" is active
+
   if(b25ref&&!f.useCustom){
+    // Show 2025 boundaries immediately, scale if total marks entered
     const scaledAs=maxN>0?Math.round(b25ref.as/b25ref.max*maxN):b25ref.as;
-    const scaledA=maxN>0?Math.round(b25ref.a/b25ref.max*maxN):b25ref.a;
-    const scaledB=maxN>0?Math.round(b25ref.b/b25ref.max*maxN):b25ref.b;
-    const dispMax=maxN>0?maxN:b25ref.max;
-    bDiv.appendChild(div({style:{fontSize:"10px",color:"#6b6b68",padding:"6px 10px",background:"#f7f7f5",borderRadius:"6px"}},
-      "Boundaries"+(maxN>0?" scaled to /"+dispMax:"")+" — A*: "+scaledAs+", A: "+scaledA+", B: "+scaledB+" /"+dispMax));
+    const scaledA =maxN>0?Math.round(b25ref.a /b25ref.max*maxN):b25ref.a;
+    const scaledB =maxN>0?Math.round(b25ref.b /b25ref.max*maxN):b25ref.b;
+    const dispMax =maxN>0?maxN:b25ref.max;
+    bDiv.appendChild(div({style:{fontSize:"10px",color:"#0C447C",padding:"6px 10px",background:"#E6F1FB",borderRadius:"6px",border:"0.5px solid #85B7EB"}},
+      "2025 boundaries"+(maxN>0&&maxN!==b25ref.max?" (scaled to /"+dispMax+")":"")+" — A*: "+scaledAs+", A: "+scaledA+", B: "+scaledB+" /"+dispMax));
   }
-  if(f.useCustom){
+
+  // Show manual fields when useCustom OR no b25ref for this paper
+  if(f.useCustom||!b25ref){
     const cg=div({style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"6px"}});
     [["A*","bAs"],["A","bA"],["B","bB"]].forEach(([l,k])=>{
       cg.appendChild(div({},[
         el("label",{style:{fontSize:"10px",color:"#6b6b68",display:"block",marginBottom:"3px"}},l),
-        liveInp({type:"number",class:"is",placeholder:l,value:f[k]}, val=>{state.addForm[k]=val;}),
+        liveInp({type:"number",class:"is",placeholder:l,value:f[k]},val=>{state.addForm[k]=val;}),
       ]));
     });
     bDiv.appendChild(cg);
@@ -478,9 +488,8 @@ function buildAddModal(){
         const b25r=((B25[af.subject]||{})[af.paper])||null;
         const mn=parseInt(af.maxMarks);
         let cb;
-        if(af.useCustom){cb={as:af.bAs?parseInt(af.bAs):null,a:parseInt(af.bA)||0,b:parseInt(af.bB)||0,max:mn};}
+        if(af.useCustom||!b25r){cb={as:af.bAs?parseInt(af.bAs):null,a:parseInt(af.bA)||0,b:parseInt(af.bB)||0,max:mn};}
         else if(b25r){cb={as:b25r.as?Math.round(b25r.as/b25r.max*mn):null,a:Math.round(b25r.a/b25r.max*mn),b:Math.round(b25r.b/b25r.max*mn),max:mn};}
-        else{cb={as:null,a:null,b:null,max:mn};}
         const np={id:"custom_"+Date.now(),subject:af.subject,paper:finalPaper,displayPaper,year:af.year.trim(),customBoundary:cb,pmtUrl:""};
         setState({customPapers:[...state.customPapers,np],showAdd:false});
         schedSave();
@@ -493,7 +502,6 @@ function buildAddModal(){
   return wrap;
 }
 
-// ── Init ────────────────────────────────────────────────────────────────────
 dbLoad().then(saved=>{
   if(saved.paperData)state.paperData=saved.paperData;
   if(saved.doneTopics)state.doneTopics=saved.doneTopics;
